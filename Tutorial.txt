@@ -1,0 +1,3 @@
+http://lucene.apache.org/core/7_1_0/index.html
+
+https://wiki.apache.org/lucene-java/LuceneFAQ
