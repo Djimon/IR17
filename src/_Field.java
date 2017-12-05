@@ -29,37 +29,37 @@ public class _Field implements IndexableField
 
 	@Override
 	public IndexableFieldType fieldType() {
-		// TODO Auto-generated method stub
+		// do Stuff
 		return null;
 	}
 
 	@Override
 	public TokenStream tokenStream(Analyzer analyzer, TokenStream reuse) {
-		// TODO Auto-generated method stub
+		// do Stuff
 		return null;
 	}
 
 	@Override
 	public BytesRef binaryValue() {
-		// TODO Auto-generated method stub
+		// do Stuff
 		return null;
 	}
 
 	@Override
 	public String stringValue() {
-		// TODO Auto-generated method stub
+		// do Stuff
 		return null;
 	}
 
 	@Override
 	public Reader readerValue() {
-		// TODO Auto-generated method stub
+		// do Stuff
 		return null;
 	}
 
 	@Override
 	public Number numericValue() {
-		// TODO Auto-generated method stub
+		// do Stuff
 		return null;
 	}
 	
