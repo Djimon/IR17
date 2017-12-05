@@ -86,7 +86,7 @@ public class LuceneTest
 	
 	private void StemmQuery() 
 	{
-		// TODO Auto-generated method stub
+		// do Stuff
 			
 	}
 	
