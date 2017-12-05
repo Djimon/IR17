@@ -1,4 +1,4 @@
-import java.io.Reader;
+ import java.io.Reader;
 import java.util.ArrayList;
 import java.util.Scanner;
 
@@ -70,6 +70,8 @@ public class LuceneTest
 
 	private void RunPorterStemmer() 
 	{
+		
+		// I bims 1 nicer Porter Stemmer
 		// TODO: run porter Stemmer on all given docs in docList and fill the stemmedDocList with the stemmed words
 		// this.docList	
 	}
