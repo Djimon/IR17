@@ -23,15 +23,15 @@ enum rankingModel {VectorSpace,OkapiBM25,invalid}
 	standard functionality for analyzing, indexing, and searching text-based documents.  The
 	following criteria have to be met by your Information Retrieval system.
 	
-	[] Using  Lucene,  parse  and  index HTML documents  that  a  given  folder  and  its subfolders 
+	[Friedrich] Using  Lucene,  parse  and  index HTML documents  that  a  given  folder  and  its subfolders 
 		contain.  List all parsed files!!!!
-	[] Consider the English language and use a stemmer for it (e.g. Porter Stemmer)
-	[] Select an available search index or create a new one (if not available in the chosen directory)
-	[] Make possible for the user to choose the ranking model, Vector Space Model (VS) 
-		or Okapi BM25 (OK)
-	[] Print  a  ranked  list  of  relevant  articles  given  a  search  query.   The  output  should
+	[Friedrich] Consider the English language and use a stemmer for it (e.g. Porter Stemmer)
+	[Kilian] Select an available search index or create a new one (if not available in the chosen directory)
+	[Kilian] Make possible for the user to choose the ranking model, Vector Space Model (VS) 
+		or Okapi BM25 (OK) -> beinhaltet auch das Berechnen der einzelnen rankings
+	[?] Print  a  ranked  list  of  relevant  articles  given  a  search  query.   The  output  should
 		contain 10 most relevant documents with their rank, title and summary, relevance score and path.
-	[] Search   multiple   fields   concurrently   (multifield   search): not   only   search   the
+	[Chris] Search   multiple   fields   concurrently   (multifield   search): not   only   search   the
 		document’s text (body tag), but also its title
 	
 	[X] Create  a  jar-File  named  IR_P01.jar. 
@@ -49,6 +49,7 @@ public class LuceneTest
 	private String querryArray[];
 	private ArrayList<Document> docList = new ArrayList<Document>();
 	private ArrayList<Document> stemmedDocList = new ArrayList<Document>();
+	// Add all the variables you need ;)
 	
 	public LuceneTest(String docs, String index, rankingModel rank, ArrayList<String> query)
 	{
