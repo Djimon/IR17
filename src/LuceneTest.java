@@ -16,7 +16,6 @@ import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.analysis.TokenStream;
-
 import org.apache.lucene.index.DirectoryReader;
 //Friedrich added the following
 import org.apache.lucene.index.IndexWriterConfig;
@@ -25,6 +24,8 @@ import org.apache.lucene.index.IndexWriter;
 //conflict
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
+import org.apache.lucene.document.Field.Store;
+import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.Fields;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.IndexableFieldType;
@@ -84,6 +85,8 @@ public class LuceneTest {
 	private String querryArray[];
 	private ArrayList<Document> docList = new ArrayList<Document>();
 	private ArrayList<Document> stemmedDocList = new ArrayList<Document>();
+	
+	public LuceneTest (String docs, String index, rankingModel rank, ArrayList<String> query) 
 	{
 		this.querryArray = new String[query.size()];
 		for (int i = 0; i < query.size(); i++) {
@@ -108,47 +111,42 @@ public class LuceneTest {
 		// index from the stemmedDocList
 	}
 
+	
 	// Friedrich added a method
-	private Document getDocument(File file) throws IOException {
+	private Document getDocument(File file, jsoupResultStrings result) throws IOException {
 		// TASK: Method to get a lucene document from HTML filoes in folder
 		// create various types of fields
 		Document document = new Document();
-
+		
 		// index file contents
-		Field contentField = new Field(LuceneConstants.CONTENTS,
-				new FileReader(file));
+		Field contentField = new TextField("content", result.getBody(), Store.YES);
 		// index file name
-		Field fileNameField = new Field(LuceneConstants.FILE_NAME,
-				file.getName(), Field.Store.YES, Field.Index.NOT_ANALYZED);
-
+		Field fileNameField = new TextField("name", result.getTitle(), Store.YES);
 		// index file path
-		Field filePathField = new Field(LuceneConstants.FILE_PATH,
-				file.getCanonicalPath(), Field.Store.YES,
-				Field.Index.NOT_ANALYZED);
+		Field filePathField = new TextField("path",file.getCanonicalPath(), Store.YES);
 
 		document.add(contentField);
 		document.add(fileNameField);
 		document.add(filePathField);
 
 		return document;
-		/*
-		 * create documents via JSOUP(jsoup.org) 
-		 * Document doc = Jsoup.parse(docPath); 
-		 *only one document import (jsoup collides with
-		 * lucene) //ouput the title and the body content 
-		 * String title = doc.title(); 
-		 * String body = doc.body().text();
-		 */
-
+	}
+	
+private jsoupResultStrings getJsoupStrings(File file){	
+		// create documents via JSOUP(jsoup.org) 
+		org.jsoup.nodes.Document doc = Jsoup.parse(docPath); 
+		 //only one document import (jsoup collides with lucene) 
+		 //ouput the title and the body content 
+		 jsoupResultStrings result = new jsoupResultStrings(doc.title(),doc.body().text());
+return result;
 	}
 
 	private void ParseDocsinGivenFolder() {
 
-		// managing subfolders:
 		File folder = new File(docPath);
 		File[] listOfFiles = folder.listFiles();
-		showFiles(listOfFiles); // method for directory traversal and listing of
-								// files
+		showFiles(listOfFiles); 
+		// TODO: read and show each HTML document and save its contents as new Document()						
 
 		// Friedrich added the following:
 		Analyzer analyzer = new StandardAnalyzer();
@@ -161,7 +159,7 @@ public class LuceneTest {
 		// indexwriterconfig
 		// IndexWriter indexWriter = new IndexWriter(index, config);
 
-		// TODO: read each HTML document and save its contents as new Document()
+		
 		// TODO: add header and body field to the new Document (doc.Add(new
 		// IndexableField) ???
 
@@ -169,7 +167,7 @@ public class LuceneTest {
 		// n.add(???);
 	}
 
-	private static void showFiles(File[] files) {
+	private void showFiles(File[] files) {
 		// TODO: Parse the whole folder (including subfolders) and list the
 		// html-documents
 		for (File file : files) {
@@ -178,6 +176,14 @@ public class LuceneTest {
 				showFiles(file.listFiles());  //recursion
 			} else {
 				System.out.println("File: " + file.getName());
+				
+				try {
+					getDocument(file, getJsoupStrings(file));
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					//e.printStackTrace();
+					System.out.println("Error: "+e);
+				}
 
 			}
 		}
