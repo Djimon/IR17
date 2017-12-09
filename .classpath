@@ -6,5 +6,6 @@
 	<classpathentry kind="lib" path="C:/Users/admin/workspace/IR/src/lucene-core-7.1.0.jar"/>
 	<classpathentry kind="lib" path="C:/Users/admin/workspace/IR/src/lucene-demo-7.1.0.jar"/>
 	<classpathentry kind="lib" path="C:/Users/admin/workspace/IR/src/lucene-queryparser-7.1.0.jar"/>
+	<classpathentry kind="lib" path="src/jsoup-1.11.2.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
