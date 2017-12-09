@@ -14,6 +14,10 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.IndexWriter;
+import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.Version;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -87,6 +91,9 @@ public class LuceneTest
 	private String querryString = "";
 	private ArrayList<Document> docList = new ArrayList<Document>();
 	private ArrayList<Document> stemmedDocList = new ArrayList<Document>();
+	private IndexWriter writer;
+	private File indexDirectory;
+	private Path path;
 	
 	public LuceneTest (String docs, String index, rankingModel rank, ArrayList<String> query) 
 	{
@@ -98,71 +105,101 @@ public class LuceneTest
 		}
 		this.docPath = docs;
 		this.indexPath = index;
-		this.ranking = rank;
-		
+		this.ranking = rank; 
 	}
 	
+/*
+ Metafunction calling the consecutive functions to get all source files and processing it with the IndexWriter. 	
+ */
 	private void SelectIndex() 
+	{	
+		createIndexWriter();
+		validateFiles();
+		closeIndexWriter();
+	}
+	
+	/*
+	 Creates a new indexwriter after checking if directory exists
+	 */
+	private void createIndexWriter()
 	{
-		Path path = FileSystems.getDefault().getPath(indexPath, "invertedIndex.idx");
-		
-		/*
-		 If file already exists, index has already been created. Otherwise a new file is created which will contain the inverted index.
-		 */
-		if(!java.nio.file.Files.exists(path))
-		{
-			/*
-			 Create File.
-			 */
-			File file = new File(path.toString());
-			file.mkdirs();
-			try {
-				file.createNewFile();
-			} catch (IOException e) {
-				System.out.println("Creating new file was unsuccessful. File already exists");
-				e.printStackTrace();
-			}
-			
-			/*
-			 Actual creation of the inverted index.
-			 */
-			ArrayList<String> index = new ArrayList<String>();
-					//TODO: create index
-			
-			for (Document doc : stemmedDocList) {
-				
-				
-			}
-			
-			
-			/*
-			 Writing the inverted index into the file.
-			 */
-			BufferedWriter output = null;
-			String temp = "";
-			String[] temp2 = new String[index.size()];
-			temp2 = index.toArray(temp2);
-			for (int i = 0; i < index.size(); i++)
+		try{
+			indexDirectory = new File(indexPath);
+			if(!indexDirectory.exists())
 			{
-				temp += temp2[i];
+				indexDirectory.mkdir();
 			}
-	        try {
-	            output = new BufferedWriter(new FileWriter(file));
-	            output.write(temp);
-	        } catch ( IOException e ) {
-	            e.printStackTrace();
-	        } 
-	        try {
-				output.close();
-			} catch (IOException e) {
-				System.out.println("BufferedWriter can't be closed, because it wasn't initialized.");
+			FSDirectory dir = FSDirectory.open(path);
+			IndexWriterConfig config = new IndexWriterConfig(AnalyzerIncludingStemmer);
+			writer = new IndexWriter(dir, config);
+		}
+		catch(Exception e){
+			System.out.println("Couldn't get the Index Writer.");
+			e.printStackTrace();
+		}
+	}
+	
+	/*
+	 Gets all files at given source file path and checks if it can be used. If usable it will be processed and indexed.
+	 */
+	private void validateFiles()
+	{
+		File[] Sourcefiles = new File[new File(docPath).list().length];
+		Sourcefiles = new File(docPath).listFiles();
+		
+		for(File f : Sourcefiles)
+		{
+			try{
+				// Checks if file can be used
+				if(!f.isDirectory() && f.exists() && !f.isFile() && !f.isHidden() 
+					&& f.canRead() && f.length() > 0 && f.getName().endsWith(".html"))
+				{
+					System.out.println("Currently trying to index file: " + f.getAbsolutePath());
+					// calling function to actually index the file
+					indexFile(f);
+					System.out.println("Successfully index file: " + f.getAbsolutePath());
+				}
+			}
+			catch(Exception e)
+			{
+				System.out.println("Couldn't index current file at " + f.getAbsolutePath());
 				e.printStackTrace();
 			}
 		}
-		
-		// TODO: Select index from given folder, if not available, create the index from the stemmedDocList		
 	}
-
+	
+	/*
+	 Converting all files into multifield documents with getDocument(), then adding it to the
+	 Index Writer and therefor indexing the file.
+	 */
+	private void indexFile(File f)
+	{
+		try {
+			Document d = getDocument(f, getJsoupStrings(f));
+			if(d != null)
+			{
+				writer.addDocument(d);
+			}
+		} catch (IOException e) {
+			System.out.println("Couldn't get Document.");
+			e.printStackTrace();
+		}	
+	}
+	
+	/*
+	 Closing the Index Writer after processing all files.
+	 */
+	private void closeIndexWriter()
+	{
+		try{
+			writer.close();
+		}
+		catch(Exception e)
+		{
+			System.out.println("Couldn't close Index Writer.");
+			e.printStackTrace();
+		}
+	}
 	private void RunPorterStemmer() 
 	{
 
@@ -175,7 +212,7 @@ public class LuceneTest
 	
 	// Friedrich added a method
 	private Document getDocument(File file, jsoupResultStrings result) throws IOException {
-		// TASK: Method to get a lucene document from HTML filoes in folder
+		// TASK: Method to get a lucene document from HTML files in folder
 		// create various types of fields
 		Document document = new Document();
 		
