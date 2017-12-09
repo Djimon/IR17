@@ -172,12 +172,6 @@ public class LuceneTest
 		// this.docList
 	}
 
-	private void SelectIndex() 
-	{
-		// TODO: Select index from given folder, if not available, create the
-		// index from the stemmedDocList
-	}
-
 	
 	// Friedrich added a method
 	private Document getDocument(File file, jsoupResultStrings result) throws IOException {
