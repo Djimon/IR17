@@ -1,14 +1,23 @@
- import java.io.Reader;
+ import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Reader;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.Scanner;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.util.FilesystemResourceLoader;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.Fields;
 import org.apache.lucene.index.IndexableField;
 import org.apache.lucene.index.IndexableFieldType;
 import org.apache.lucene.util.BytesRef;
+
+
+import java.nio.file.*;
 
 enum rankingModel {VectorSpace,OkapiBM25,invalid}
 
@@ -66,6 +75,62 @@ public class LuceneTest
 	
 	private void SelectIndex() 
 	{
+		Path path = FileSystems.getDefault().getPath(indexPath, "invertedIndex.idx");
+		
+		/*
+		 If file already exists, index has already been created. Otherwise a new file is created which will contain the inverted index.
+		 */
+		if(!java.nio.file.Files.exists(path))
+		{
+			/*
+			 Create File.
+			 */
+			File file = new File(path.toString());
+			file.mkdirs();
+			try {
+				file.createNewFile();
+			} catch (IOException e) {
+				System.out.println("Creating new file was unsuccessful. File already exists");
+				e.printStackTrace();
+			}
+			
+			/*
+			 Actual creation of the inverted index.
+			 */
+			ArrayList<String> index = new ArrayList<String>();
+					//TODO: create index
+			
+			for (Document doc : stemmedDocList) {
+				
+				
+			}
+			
+			
+			/*
+			 Writing the inverted index into the file.
+			 */
+			BufferedWriter output = null;
+			String temp = "";
+			String[] temp2 = new String[index.size()];
+			temp2 = index.toArray(temp2);
+			for (int i = 0; i < index.size(); i++)
+			{
+				temp += temp2[i];
+			}
+	        try {
+	            output = new BufferedWriter(new FileWriter(file));
+	            output.write(temp);
+	        } catch ( IOException e ) {
+	            e.printStackTrace();
+	        } 
+	        try {
+				output.close();
+			} catch (IOException e) {
+				System.out.println("BufferedWriter can't be closed, because it wasn't initialized.");
+				e.printStackTrace();
+			}
+		}
+		
 		// TODO: Select index from given folder, if not available, create the index from the stemmedDocList		
 	}
 
@@ -161,7 +226,7 @@ public class LuceneTest
 				//System.out.println("arg "+i +": " + args[i]);
 			}	
 			SearchObject = new LuceneTest(docFolder, indexFolder, ranking, query);
-			System.out.println("Successfully instantiatet SearchObject:");
+			System.out.println("Successfully instantiated SearchObject:");
 			System.out.println(SearchObject.toString());
 			
 			//**********************************
