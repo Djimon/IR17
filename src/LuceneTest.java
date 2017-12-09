@@ -1,44 +1,32 @@
-import java.io.Reader;
-//Friedrich added the following
 import java.io.File;
-import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Scanner;
-//Friedrich added the following
-import java.util.Iterator;
-
 import org.apache.lucene.analysis.Analyzer;
-//Friedrich added the following
-import org.apache.lucene.util.Constants;
+import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.store.RAMDirectory;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.index.DirectoryReader;
-//Friedrich added the following
-import org.apache.lucene.index.IndexWriterConfig;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexWriter;
-//conflict
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.Fields;
-import org.apache.lucene.index.IndexableField;
-import org.apache.lucene.index.IndexableFieldType;
-import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreDoc;
+import org.apache.lucene.search.TopDocs;
 import org.jsoup.Jsoup;
-import org.jsoup.helper.Validate;
-//import org.jsoup.nodes.Document;
-import org.jsoup.select.Elements;
+import org.jsoup.nodes.Element;
 
-import java.io.IOException;
-
-enum rankingModel {
+enum rankingModel 
+{
 	VectorSpace, OkapiBM25, invalid
+}
+
+enum Fieldz 
+{
+	title, content, path, summary
 }
 
 /*
@@ -73,8 +61,11 @@ enum rankingModel {
  * FERTIGE TEILAUFGABEN MIT NEU COMPILIERTER .JAR TESTEN UND MIT 'X' ABHAKEN!!
  */
 
-public class LuceneTest {
-
+public class LuceneTest 
+{
+	ArrayList<SearchResult> SearchOutput = new ArrayList<SearchResult>();
+	EnglishAnalyzer AnalyzerIncludingStemmer = new EnglishAnalyzer();
+	private IndexSearcher ISearch;
 	private String docPath;
 	private String indexPath;
 	// Friedrich added the following:
@@ -83,6 +74,7 @@ public class LuceneTest {
 
 	private rankingModel ranking;
 	private String querryArray[];
+	private String querryString = "";
 	private ArrayList<Document> docList = new ArrayList<Document>();
 	private ArrayList<Document> stemmedDocList = new ArrayList<Document>();
 	
@@ -91,14 +83,17 @@ public class LuceneTest {
 		this.querryArray = new String[query.size()];
 		for (int i = 0; i < query.size(); i++) {
 			this.querryArray[i] = query.get(i);
+			this.querryString += query.get(i) + " ";
 			// System.out.println("get "+query.get(i));
 		}
 		this.docPath = docs;
 		this.indexPath = index;
 		this.ranking = rank;
+		
 	}
 
-	private void RunPorterStemmer() {
+	private void RunPorterStemmer() 
+	{
 
 		// I bims 1 nicer Porter Stemmer
 		// TODO: run porter Stemmer on all given docs in docList and fill the
@@ -106,7 +101,8 @@ public class LuceneTest {
 		// this.docList
 	}
 
-	private void SelectIndex() {
+	private void SelectIndex() 
+	{
 		// TODO: Select index from given folder, if not available, create the
 		// index from the stemmedDocList
 	}
@@ -119,26 +115,35 @@ public class LuceneTest {
 		Document document = new Document();
 		
 		// index file contents
-		Field contentField = new TextField("content", result.getBody(), Store.YES);
+		Field contentField = new TextField(Fieldz.title.name(), result.getBody(), Store.YES);
 		// index file name
-		Field fileNameField = new TextField("name", result.getTitle(), Store.YES);
+		Field fileNameField = new TextField(Fieldz.content.name(), result.getTitle(), Store.YES);
 		// index file path
-		Field filePathField = new TextField("path",file.getCanonicalPath(), Store.YES);
+		Field filePathField = new TextField(Fieldz.path.name(),file.getCanonicalPath(), Store.YES);
+		// index file summary
+		Field summaryField = new TextField(Fieldz.summary.name(), result.getSummary(), Store.YES);
 
 		document.add(contentField);
 		document.add(fileNameField);
 		document.add(filePathField);
+		document.add(summaryField);
 
 		return document;
 	}
 	
-private jsoupResultStrings getJsoupStrings(File file){	
+	private jsoupResultStrings getJsoupStrings(File file)
+	{	
 		// create documents via JSOUP(jsoup.org) 
 		org.jsoup.nodes.Document doc = Jsoup.parse(docPath); 
+		
+		Element summ = doc.select("summary").first();
+		String s = summ.html();
+		if (s.length() <= 0)
+			s  = doc.body().text().substring(0, Math.min(doc.body().text().length(), 17)) + "...";
 		 //only one document import (jsoup collides with lucene) 
 		 //ouput the title and the body content 
-		 jsoupResultStrings result = new jsoupResultStrings(doc.title(),doc.body().text());
-return result;
+		 jsoupResultStrings result = new jsoupResultStrings(doc.title(),doc.body().text(), s);
+		 return result;
 	}
 
 	private void ParseDocsinGivenFolder() {
@@ -182,7 +187,7 @@ return result;
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					//e.printStackTrace();
-					System.out.println("Error: "+e);
+					ErrorAndExit(e.toString());
 				}
 
 			}
@@ -193,14 +198,60 @@ return result;
 		// do Stuff
 
 	}
-
-	private void Search() {
-
-		/*
-		 * TODO: Do the actual searching with: - calculating tf-idf - relevance
-		 * score - ranking - konkurierende Suche in Titel und Textkörper
-		 * (mulrifield search)
-		 */
+	
+	private void Search(Query query, int bestN) 
+	{
+		/* TODO: Do the actual searching with:
+		 * - calculating tf-idf
+		 * - relevance score
+		 * - ranking
+		 * - konkurierende Suche in Titel und Textkörper (mulrifield search)
+		 */		
+		ScoreDoc[] hits = null;
+		Query Qtitle = null;
+		Query Qbody = null;
+		try 
+		{
+			Qtitle = new QueryParser(Fieldz.title.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
+			Qbody = new QueryParser(Fieldz.content.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
+		} 
+		catch (ParseException e1) {ErrorAndExit(e1.toString());}
+		
+		try 
+		{
+			TopDocs docsTitle = ISearch.search(Qtitle, bestN);
+			TopDocs docsBody = ISearch.search(Qbody, bestN);
+	        hits = TopDocs.merge(bestN, new TopDocs[]{docsTitle,docsBody}).scoreDocs;
+		} 
+		catch (IOException e2) {ErrorAndExit(e2.toString());}
+		
+		if (hits != null && hits.length > 0)
+		{
+			for ( int i= 0; i< hits.length; i++)
+			{
+				int docID = hits[i].doc;
+				Document D = null;
+				try 
+				{
+					D = ISearch.doc(docID);
+				} 
+				catch (IOException e) {System.out.println("Error in Doc " + i); continue;}
+				
+				if (D != null)
+				{
+					//TODO: Get relevance!!!
+					String relevance = "???";
+					SearchOutput.add(new SearchResult(i+1, 
+													  D.get(Fieldz.title.name()),
+													  D.get(Fieldz.summary.name()),
+													  relevance,
+													  hits[i].score,
+													  D.get(Fieldz.path.name())));
+				}		 
+			}
+		}
+		else
+			System.out.println("Document score container is null.");		
 	}
 
 	private void PrintResults() {
@@ -208,6 +259,7 @@ return result;
 		 * TODO: print best 10 documents with: -> rank, title, summary,
 		 * relevance, score, path
 		 */
+		
 	}
 
 	public String toString() {
@@ -266,7 +318,9 @@ return result;
 
 			SearchObject.SelectIndex();
 			SearchObject.StemmQuery();
-			SearchObject.Search();
+			
+			//SearchObject.Search([Query here], 10);
+			
 		}
 	}
 
