@@ -14,6 +14,7 @@ import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -25,10 +26,14 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.similarities.BM25Similarity;
+import org.apache.lucene.search.similarities.ClassicSimilarity;
+import org.apache.lucene.search.similarities.Similarity;
+import org.apache.lucene.search.similarities.TFIDFSimilarity;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 
-
+import javafx.scene.control.IndexRange;
 
 import java.nio.file.*;
 
@@ -59,8 +64,8 @@ enum Fieldz
 	[Friedrich] Using  Lucene,  parse  and  index HTML documents  that  a  given  folder  and  its subfolders 
 		contain.  List all parsed files!!!!
 	[Friedrich] Consider the English language and use a stemmer for it (e.g. Porter Stemmer)
-	[Kilian] Select an available search index or create a new one (if not available in the chosen directory)
-	[Kilian] Make possible for the user to choose the ranking model, Vector Space Model (VS) 
+	[X] Select an available search index or create a new one (if not available in the chosen directory)
+	[X] Make possible for the user to choose the ranking model, Vector Space Model (VS) 
 		or Okapi BM25 (OK) -> beinhaltet auch das Berechnen der einzelnen rankings
 	[?] Print  a  ranked  list  of  relevant  articles  given  a  search  query.   The  output  should
 		contain 10 most relevant documents with their rank, title and summary, relevance score and path.
@@ -79,6 +84,7 @@ public class LuceneTest
 {
 	ArrayList<SearchResult> SearchOutput = new ArrayList<SearchResult>();
 	EnglishAnalyzer AnalyzerIncludingStemmer = new EnglishAnalyzer();
+	private IndexReader IR;
 	private IndexSearcher ISearch;
 	private String docPath;
 	private String indexPath;
@@ -106,11 +112,23 @@ public class LuceneTest
 		this.docPath = docs;
 		this.indexPath = index;
 		this.ranking = rank; 
+		this.path = FileSystems.getDefault().getPath(indexPath);
+		//TODO: Instantiate IndexReader
+		this.IR = IndexReader.open(FSDirectory.open(path));
+		this.ISearch = new IndexSearcher(IR);
+		if(rank.equals(rankingModel.OkapiBM25))
+		{
+			ISearch.setSimilarity(new BM25Similarity());
+		}
+		else if(rank.equals(rankingModel.VectorSpace))
+		{
+			ISearch.setSimilarity(new ClassicSimilarity());
+		}		
 	}
 	
-/*
- Metafunction calling the consecutive functions to get all source files and processing it with the IndexWriter. 	
- */
+	/*
+ 	 Metafunction calling the consecutive functions to get all source files and processing it with the IndexWriter. 	
+	 */
 	private void SelectIndex() 
 	{	
 		createIndexWriter();
@@ -200,6 +218,7 @@ public class LuceneTest
 			e.printStackTrace();
 		}
 	}
+	
 	private void RunPorterStemmer() 
 	{
 
