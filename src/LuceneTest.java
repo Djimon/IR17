@@ -1,3 +1,32 @@
+
+/*
+ * HINWEIS/ INFO: laut Aufgabenstellung soll das Programm folgendermaßen
+ * aufgerufen werden: java -jar IR_P01.jar [pathtodocumentfolder] [pathtoindexfolder] [VS/OK] [query] 
+ * Ausführung mit diesen parametern funktioniert bereits, sogar mit beliebig langer query 
+ * (IR_P01.jar im Ordner "release")
+ *
+ * Aufgabenstellung:  
+  	Lucene is an open source search library that provides
+	standard functionality for analyzing, indexing, and searching text-based documents.  The
+	following criteria have to be met by your Information Retrieval system.
+	
+	[X] Using  Lucene,  parse  and  index HTML documents  that  a  given  folder  and  its subfolders 
+		contain.  List all parsed files!!!!
+	[X] Consider the English language and use a stemmer for it (e.g. Porter Stemmer)
+	[X] Select an available search index or create a new one (if not available in the chosen directory)
+	[X] Make possible for the user to choose the ranking model, Vector Space Model (VS) 
+		or Okapi BM25 (OK) -> beinhaltet auch das Berechnen der einzelnen rankings
+	[X] Print  a  ranked  list  of  relevant  articles  given  a  search  query.   The  output  should
+		contain 10 most relevant documents with their rank, title and summary, relevance score and path.
+	[X?] Search   multiple   fields   concurrently   (multifield   search): not   only   search   the
+		document’s text (body tag), but also its title
+	
+	[X] Create  a  jar-File  named  IR_P01.jar. 
+	[X] It should process the input: 
+		> java -jar IRP01.jar [pathtodocumentfolder] [pathtoindexfolder] [VS/OK] [query]		
+
+ */
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -46,40 +75,63 @@ enum Fieldz
 	title, content, path, summary
 }
 
-/*
- * HINWEIS/ INFOS: laut Aufgabenstellung soll das Programm folgendermaßen
- * afugerufen werden java -jar IR_P01.jar [pathtodocumentfolder]
- * [pathtoindexfolder] [VS/OK] [query] Ausführung mit diesen parametern
- * funktioniert bereits, sogar mit beliebig langer query siehe IR_P01.jar im
- * Ordner (release)
- * 
-
- * Aufgabenstellung:  
-  	Lucene is an open source search library that provides
-	standard functionality for analyzing, indexing, and searching text-based documents.  The
-	following criteria have to be met by your Information Retrieval system.
-	
-	[Friedrich] Using  Lucene,  parse  and  index HTML documents  that  a  given  folder  and  its subfolders 
-		contain.  List all parsed files!!!!
-	[Friedrich] Consider the English language and use a stemmer for it (e.g. Porter Stemmer)
-	[X] Select an available search index or create a new one (if not available in the chosen directory)
-	[X] Make possible for the user to choose the ranking model, Vector Space Model (VS) 
-		or Okapi BM25 (OK) -> beinhaltet auch das Berechnen der einzelnen rankings
-	[?] Print  a  ranked  list  of  relevant  articles  given  a  search  query.   The  output  should
-		contain 10 most relevant documents with their rank, title and summary, relevance score and path.
-	[Chris] Search   multiple   fields   concurrently   (multifield   search): not   only   search   the
-		document’s text (body tag), but also its title
-	
-	[X] Create  a  jar-File  named  IR_P01.jar. 
-	[X] It should process the input: 
-		> java -jar IRP01.jar [pathtodocumentfolder] [pathtoindexfolder] [VS/OK] [query]		
- * 
-
- * FERTIGE TEILAUFGABEN MIT NEU COMPILIERTER .JAR TESTEN UND MIT 'X' ABHAKEN!!
- */
-
 public class LuceneTest 
 {
+	// ***************************************************** \\
+	// ****************** MAIN METHODE ********************* \\
+	// ***************************************************** \\
+
+	public static void main(String[] args) 
+	{
+		String docFolder = null;
+		String indexFolder = null;
+		rankingModel ranking = rankingModel.invalid;
+		ArrayList<String> query = new ArrayList<String>();
+		LuceneTest SearchObject = null;
+
+		if (args.length >= 3) {
+			docFolder = args[0];
+			indexFolder = args[1];
+			if (!new File(indexFolder).isDirectory())
+				ErrorAndExit("Argument 2 is no directory:" + indexFolder);
+			ranking = (args[2].equals("VS") ? rankingModel.VectorSpace
+					: args[2].equals("OK") ? rankingModel.OkapiBM25
+							: rankingModel.invalid);
+		} else {
+			ErrorAndExit("arguments missing - programm needs at least 4");
+		}
+
+		if (ranking == rankingModel.invalid) {
+			ErrorAndExit("entered invalid ranking model(" + args[2] + ")");
+		} else {
+			for (int i = 3; i < args.length; i++) {
+				query.add(args[i]);
+				// System.out.println("arg "+i +": " + args[i]);
+			}
+
+			SearchObject = new LuceneTest(docFolder, indexFolder, ranking,
+					query);
+
+			System.out.println("Successfully instantiated SearchObject:");
+			//System.out.println(SearchObject.toString());
+
+			// **********************************
+			// TODO: COMPLETE SEARCH LOGIC HERE!!
+			// **********************************
+			SearchObject.SetSimilarityMethod();
+
+			SearchObject.SelectIndex();
+			SearchObject.CreateIndexReaderAndSearcher();
+			
+			SearchObject.Search(10);
+			SearchObject.PrintResults();
+		}
+	}
+	
+	// ***************************************************** \\
+	// ****************** Class Attributes ***************** \\
+	// ***************************************************** \\
+	
 	ArrayList<SearchResult> SearchOutput = new ArrayList<SearchResult>();
 	EnglishAnalyzer AnalyzerIncludingStemmer = new EnglishAnalyzer();
 	private IndexReader IR;
@@ -102,6 +154,7 @@ public class LuceneTest
 	private Path path;
 	private Query Qquery;
 	
+	// CONSTRUCTOR
 	public LuceneTest (String docs, String index, rankingModel rank, ArrayList<String> query) 
 	{
 		this.querryArray = new String[query.size()];
@@ -124,7 +177,8 @@ public class LuceneTest
 	private void SelectIndex() 
 	{	
 		createIndexWriter();
-		validateFiles();
+		ParseDocsinGivenFolder();
+		//validateFiles();
 		closeIndexWriter();
 	}
 	
@@ -165,7 +219,7 @@ public class LuceneTest
 		{
 			try{
 				// Checks if file can be used
-				if(!f.isDirectory() && f.exists() && !f.isFile() && !f.isHidden() 
+				if(!f.isDirectory() && f.exists() && f.isFile() && !f.isHidden() 
 					&& f.canRead() && f.length() > 0 && f.getName().endsWith(".html"))
 				{
 					System.out.println("Currently trying to index file: " + f.getAbsolutePath());
@@ -215,17 +269,6 @@ public class LuceneTest
 		}
 	}
 	
-	private void RunPorterStemmer() 
-	{
-
-		// I bims 1 nicer Porter Stemmer
-		// TODO: run porter Stemmer on all given docs in docList and fill the
-		// stemmedDocList with the stemmed words
-		// this.docList
-	}
-
-	
-	// Friedrich added a method
 	private Document getDocument(File file, jsoupResultStrings result) throws IOException {
 		// TASK: Method to get a lucene document from HTML files in folder
 		// create various types of fields
@@ -266,7 +309,6 @@ public class LuceneTest
 	private void ParseDocsinGivenFolder() 
 	{
 		System.out.println("parsing the folder: "+ this.docPath);
-		//TODO returns null, something wrong with docPath?
 		File folder = new File(this.docPath);
 		//System.out.println("foldername: " + folder.toString());
 		ArrayList<File> filesInFolder = new ArrayList<File>();
@@ -279,38 +321,11 @@ public class LuceneTest
 		} 
 		catch (IOException e) {System.out.println("Error: " +e);}
 		
-		/*
-		for (int i=0; i< filesInFolder.size(); i++)
-		{
-			System.out.println(filesInFolder.get(i).getName());
-		}
-		*/
-		
-		showFiles(filesInFolder); 
-		// TODO: read and show each HTML document and save its contents as new Document()						
-
-		// Friedrich added the following:
-		Analyzer analyzer = new StandardAnalyzer();
-		// create an index directory and configure it with the analyzer instance
-		// Directory index = FSDirectory.open(new File(indexPath));
-
-		IndexWriterConfig config = new IndexWriterConfig(analyzer);
-		// create a file to get directory
-
-		// indexwriterconfig
-		// IndexWriter indexWriter = new IndexWriter(index, config);
-
-		
-		// TODO: add header and body field to the new Document (doc.Add(new
-		// IndexableField) ???
-
-		// Document n = new Document();
-		// n.add(???);
+		showFiles(filesInFolder); 					
 	}
 
 	private void showFiles(ArrayList<File> files) {
-		// TODO: Parse the whole folder (including subfolders) and list the
-		// html-documents
+		// TODO: Parse the whole folder (including subfolders) and list the html-documents
 		for (File file : files) {
 			if (file.isDirectory()) 
 			{
@@ -328,11 +343,12 @@ public class LuceneTest
 			} 
 			else 
 			{
-				//System.out.println("File: " + file.getName());
-				
+				//System.out.println("File: " + file.getName());				
 				try 
 				{
-					getDocument(file, getJsoupStrings(file));
+					Document D = getDocument(file, getJsoupStrings(file));
+					if (D != null)
+						writer.addDocument(D);
 				} 
 				catch (IOException e) {ErrorAndExit(e.toString());}
 			}
@@ -341,28 +357,27 @@ public class LuceneTest
 
 	private void CreateIndexReaderAndSearcher() 
 	{
-		if (indexFSD == null)
+		if (this.indexFSD == null)
 			ErrorAndExit("couldn't find indexDirectory");
 		else
 		{
 			try 
 			{
-				this.IR = DirectoryReader.open(indexFSD); // Error here!
+				this.IR = DirectoryReader.open(this.indexFSD); 
 			} 
 			catch (IOException e) {System.out.println("Error while instantiating index reader." + e);}
-			
-			
+					
 			this.ISearch = new IndexSearcher(this.IR);
 			ISearch.setSimilarity(SIM);
 		}
 
 	}
 
-	private void SetSimilarityMethod() {
+	private void SetSimilarityMethod() 
+	{
 		if(this.ranking.equals(rankingModel.OkapiBM25))
 		{
-			SIM = new BM25Similarity();
-			
+			SIM = new BM25Similarity();			
 		}
 		else if(this.ranking.equals(rankingModel.VectorSpace))
 		{
@@ -467,10 +482,8 @@ public class LuceneTest
 		{
 			String w = SearchOutput.get(i).toString();
 			System.out.println(w);
-			//TODO: save results into file
-		}
-		
-		
+			//TODO: save results into file (nice 2 have)
+		}	
 	}
 
 	public String toString() {
@@ -481,61 +494,6 @@ public class LuceneTest
 		}
 		return (this.docPath + "\n" + this.indexPath + "\n"
 				+ this.ranking.toString() + "\n" + temp);
-	}
-
-	// ***************************************************** \\
-	// ****************** MAIN METHODEN ****************** \\
-	// ***************************************************** \\
-
-	public static void main(String[] args) {
-
-		String docFolder = null;
-		String indexFolder = null;
-		rankingModel ranking = rankingModel.invalid;
-		ArrayList<String> query = new ArrayList<String>();
-		LuceneTest SearchObject = null;
-
-		if (args.length >= 3) {
-			docFolder = args[0];
-			indexFolder = args[1];
-			if (!new File(indexFolder).isDirectory())
-				ErrorAndExit("Argument 2 is no directory:" + indexFolder);
-			ranking = (args[2].equals("VS") ? rankingModel.VectorSpace
-					: args[2].equals("OK") ? rankingModel.OkapiBM25
-							: rankingModel.invalid);
-		} else {
-			ErrorAndExit("arguments missing - programm needs at least 4");
-		}
-
-		if (ranking == rankingModel.invalid) {
-			ErrorAndExit("entered invalid ranking model(" + args[2] + ")");
-		} else {
-			for (int i = 3; i < args.length; i++) {
-				query.add(args[i]);
-				// System.out.println("arg "+i +": " + args[i]);
-			}
-
-			SearchObject = new LuceneTest(docFolder, indexFolder, ranking,
-					query);
-
-			System.out.println("Successfully instantiated SearchObject:");
-			//System.out.println(SearchObject.toString());
-
-			// **********************************
-			// TODO: COMPLETE SEARCH LOGIC HERE!!
-			// **********************************
-			SearchObject.SetSimilarityMethod();
-			SearchObject.ParseDocsinGivenFolder();
-			SearchObject.RunPorterStemmer();
-
-			// SearchObject.closeIndex();
-
-			SearchObject.SelectIndex();
-			SearchObject.CreateIndexReaderAndSearcher();
-			
-			SearchObject.Search(10);
-			SearchObject.PrintResults();
-		}
 	}
 
 	private static void ErrorAndExit(String errorMsg) {
