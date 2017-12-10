@@ -81,6 +81,7 @@ public class LuceneTest
 	EnglishAnalyzer AnalyzerIncludingStemmer = new EnglishAnalyzer();
 	private IndexReader IR;
 	private IndexSearcher ISearch;
+	private FSDirectory indexFSD = null;
 	private String docPath;
 	private String indexPath;
 	// Friedrich added the following:
@@ -128,42 +129,21 @@ public class LuceneTest
 	 */
 	private void createIndexWriter()
 	{
-		FSDirectory dir = null;
+		
 		try{
 			indexDirectory = new File(indexPath);
 			if(!indexDirectory.exists())
 			{
 				indexDirectory.mkdir();
 			}
-			dir = FSDirectory.open(new File(this.indexPath).toPath());
+			indexFSD = FSDirectory.open(new File(this.indexPath).toPath());
 			
 			IndexWriterConfig config = new IndexWriterConfig(this.AnalyzerIncludingStemmer);
-			this.writer = new IndexWriter(dir, config);
+			this.writer = new IndexWriter(indexFSD, config);
 		}
 		catch(Exception e){
 			System.out.println("Couldn't get the Index Writer.");
 			e.printStackTrace();
-		}
-		
-		if (dir == null)
-			ErrorAndExit("couldn't find indexDirectory");
-		else
-		{
-			try 
-			{
-				this.IR = DirectoryReader.open(dir); // Error here!
-			} 
-			catch (IOException e) {System.out.println("Error while instantiating index reader." + e);}
-			
-			this.ISearch = new IndexSearcher(IR);
-			if(this.ranking.equals(rankingModel.OkapiBM25))
-			{
-				ISearch.setSimilarity(new BM25Similarity());
-			}
-			else if(this.ranking.equals(rankingModel.VectorSpace))
-			{
-				ISearch.setSimilarity(new ClassicSimilarity());
-			}
 		}
 		
 	}
@@ -351,8 +331,29 @@ public class LuceneTest
 		}
 	}
 
-	private void StemmQuery() {
-		// do Stuff
+	private void CreateIndexReaderAndSearcher() 
+	{
+		if (indexFSD == null)
+			ErrorAndExit("couldn't find indexDirectory");
+		else
+		{
+			try 
+			{
+				this.IR = DirectoryReader.open(indexFSD); // Error here!
+			} 
+			catch (IOException e) {System.out.println("Error while instantiating index reader." + e);}
+			
+			
+			this.ISearch = new IndexSearcher(this.IR);
+			if(this.ranking.equals(rankingModel.OkapiBM25))
+			{
+				ISearch.setSimilarity(new BM25Similarity());
+			}
+			else if(this.ranking.equals(rankingModel.VectorSpace))
+			{
+				ISearch.setSimilarity(new ClassicSimilarity());
+			}
+		}
 
 	}
 	
@@ -371,6 +372,7 @@ public class LuceneTest
 		{
 			Qtitle = new QueryParser(Fieldz.title.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
 			Qbody = new QueryParser(Fieldz.content.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
+			System.out.println("Searching for \"" + this.querryString + "\"...");
 		} 
 		catch (ParseException e1) {ErrorAndExit(e1.toString());}
 		
@@ -379,8 +381,14 @@ public class LuceneTest
 			TopDocs docsTitle = ISearch.search(Qtitle, bestN);
 			TopDocs docsBody = ISearch.search(Qbody, bestN);
 	        hits = TopDocs.merge(bestN, new TopDocs[]{docsTitle,docsBody}).scoreDocs;
+	        System.out.println("Ranking the best 10 documents...");
 		} 
 		catch (IOException e2) {ErrorAndExit(e2.toString());}
+		
+		for( int i = 0; i < hits.length; i++)
+		{
+			System.out.println(Integer.toString(i+1) + " DocID:" + hits[i].doc );
+		}
 		
 		if (hits != null && hits.length > 0)
 		{
@@ -408,7 +416,7 @@ public class LuceneTest
 			}
 		}
 		else
-			System.out.println("Document score container is null.");		
+			System.out.println("Document score container is null or empty.");		
 	}
 
 	private void PrintResults() {
@@ -476,7 +484,7 @@ public class LuceneTest
 			// SearchObject.closeIndex();
 
 			SearchObject.SelectIndex();
-			SearchObject.StemmQuery();
+			SearchObject.CreateIndexReaderAndSearcher();
 			
 			SearchObject.Search(SearchObject.Qquery , 10);
 			
