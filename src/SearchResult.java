@@ -5,18 +5,27 @@ public class SearchResult
 	private String rank;
 	private String title;
 	private String summary;
-	private String relevance;
 	private String score;
 	private String path;
 	
-	public SearchResult(int ran, String tit, String sum, String rel, float sco, String pat)
+	public SearchResult(int ran, String tit, String sum, float sco, String pat)
 	{
 		this.rank = Integer.toString(ran);
 		this.title = tit;
 		this.summary = sum;
-		this.relevance = rel;
 		this.score = Float.toString(sco);
 		this.path = pat;
+	}
+	
+	public String toString()
+	{
+		String temp = "";
+		temp += rank +". ";
+		temp += title + ", \"";
+		temp += summary + "\"";
+		temp += "Score:" + score ;
+		temp += "(" + path + ")\n";
+		return temp;
 	}
 
 	public String getRank() {
@@ -29,10 +38,6 @@ public class SearchResult
 
 	public String getSummary() {
 		return summary;
-	}
-
-	public String getRelevance() {
-		return relevance;
 	}
 
 	public String getScore() {

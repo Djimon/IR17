@@ -28,7 +28,10 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
+import org.apache.lucene.search.similarities.Similarity;
+import org.apache.lucene.search.similarities.TFIDFSimilarity;
 import org.apache.lucene.store.FSDirectory;
+import org.apache.lucene.util.BytesRef;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 
@@ -82,6 +85,7 @@ public class LuceneTest
 	private IndexReader IR;
 	private IndexSearcher ISearch;
 	private FSDirectory indexFSD = null;
+	Similarity SIM = null;
 	private String docPath;
 	private String indexPath;
 	// Friedrich added the following:
@@ -139,6 +143,7 @@ public class LuceneTest
 			indexFSD = FSDirectory.open(new File(this.indexPath).toPath());
 			
 			IndexWriterConfig config = new IndexWriterConfig(this.AnalyzerIncludingStemmer);
+			config.setSimilarity(this.SIM);
 			this.writer = new IndexWriter(indexFSD, config);
 		}
 		catch(Exception e){
@@ -263,7 +268,7 @@ public class LuceneTest
 		System.out.println("parsing the folder: "+ this.docPath);
 		//TODO returns null, something wrong with docPath?
 		File folder = new File(this.docPath);
-		System.out.println("foldername: " + folder.toString());
+		//System.out.println("foldername: " + folder.toString());
 		ArrayList<File> filesInFolder = new ArrayList<File>();
 		try 
 		{
@@ -274,10 +279,13 @@ public class LuceneTest
 		} 
 		catch (IOException e) {System.out.println("Error: " +e);}
 		
+		/*
 		for (int i=0; i< filesInFolder.size(); i++)
 		{
 			System.out.println(filesInFolder.get(i).getName());
 		}
+		*/
+		
 		showFiles(filesInFolder); 
 		// TODO: read and show each HTML document and save its contents as new Document()						
 
@@ -345,19 +353,45 @@ public class LuceneTest
 			
 			
 			this.ISearch = new IndexSearcher(this.IR);
-			if(this.ranking.equals(rankingModel.OkapiBM25))
-			{
-				ISearch.setSimilarity(new BM25Similarity());
-			}
-			else if(this.ranking.equals(rankingModel.VectorSpace))
-			{
-				ISearch.setSimilarity(new ClassicSimilarity());
-			}
+			ISearch.setSimilarity(SIM);
 		}
 
 	}
+
+	private void SetSimilarityMethod() {
+		if(this.ranking.equals(rankingModel.OkapiBM25))
+		{
+			SIM = new BM25Similarity();
+			
+		}
+		else if(this.ranking.equals(rankingModel.VectorSpace))
+		{
+			SIM = new TFIDFSimilarity() {
+		        @Override
+		        public float tf(float freq) {
+		          return (float)Math.sqrt(freq);
+		        }
+		        @Override
+		        public float sloppyFreq(int distance) {
+		          return 1.0f / (distance + 1);
+		        }
+		        @Override
+		        public float scorePayload(int arg0, int arg1, int arg2, BytesRef arg3) {
+		          return 1;
+		        }
+		        @Override
+		        public float lengthNorm(int numTerms) {
+		          return (float) (1/Math.sqrt(numTerms));
+		        }
+		        @Override
+		        public float idf(long docFreq, long numDocs) {
+		          return (float)(Math.log(numDocs/(double)(docFreq+1)) + 1.0);
+		        }
+		      };		      
+		}
+	}
 	
-	private void Search(Query query, int bestN) 
+	private void Search(int bestN) 
 	{
 		/* TODO: Do the actual searching with:
 		 * - calculating tf-idf
@@ -378,52 +412,64 @@ public class LuceneTest
 		
 		try 
 		{
+			System.out.println("Ranking the best 10 documents...");
 			TopDocs docsTitle = ISearch.search(Qtitle, bestN);
+			System.out.println("hits in title = " + docsTitle.totalHits);
 			TopDocs docsBody = ISearch.search(Qbody, bestN);
-	        hits = TopDocs.merge(bestN, new TopDocs[]{docsTitle,docsBody}).scoreDocs;
-	        System.out.println("Ranking the best 10 documents...");
+			System.out.println("hits in body = " + docsTitle.totalHits);
+	        hits = TopDocs.merge(bestN, new TopDocs[]{docsTitle,docsBody}).scoreDocs;       
 		} 
 		catch (IOException e2) {ErrorAndExit(e2.toString());}
 		
-		for( int i = 0; i < hits.length; i++)
-		{
-			System.out.println(Integer.toString(i+1) + " DocID:" + hits[i].doc );
-		}
+		/* ERROR DESCRIPTION
+		 * =================================================================================================
+		 * Unfortunately our TopDocs array seems to be empty, so something is wrong with the search function
+		 * We instantiated the IndexSearcher with the correct similarity method.
+		 * During Debugging we checked the queries which seems to be O.K.
+		 * So from here we did not really know, what the problem could be.
+		 * =================================================================================================
+		 */
 		
-		if (hits != null && hits.length > 0)
+		if (hits.length > 0)
 		{
 			for ( int i= 0; i< hits.length; i++)
 			{
 				int docID = hits[i].doc;
 				Document D = null;
+				
 				try 
 				{
 					D = ISearch.doc(docID);
 				} 
-				catch (IOException e) {System.out.println("Error in Doc " + i); continue;}
+				catch (IOException e) {System.out.println("Error in Doc " + i);}
 				
 				if (D != null)
 				{
-					//TODO: Get relevance!!!
-					String relevance = "???";
 					SearchOutput.add(new SearchResult(i+1, 
 													  D.get(Fieldz.title.name()),
 													  D.get(Fieldz.summary.name()),
-													  relevance,
 													  hits[i].score,
 													  D.get(Fieldz.path.name())));
 				}		 
 			}
 		}
+		else if (hits == null )
+		{
+			System.out.println("this shouldn't happen: The document score container is null.");
+		}			
 		else
-			System.out.println("Document score container is null or empty.");		
+			System.out.println("No hits were found.");		
 	}
 
-	private void PrintResults() {
-		/*
-		 * TODO: print best 10 documents with: -> rank, title, summary,
-		 * relevance, score, path
-		 */
+	private void PrintResults() 
+	{
+		for (int i=0; i  < SearchOutput.size(); i++)
+		{
+			String w = SearchOutput.get(i).toString();
+			System.out.println(w);
+			//TODO: save results into file
+		}
+		
 		
 	}
 
@@ -473,11 +519,12 @@ public class LuceneTest
 					query);
 
 			System.out.println("Successfully instantiated SearchObject:");
-			System.out.println(SearchObject.toString());
+			//System.out.println(SearchObject.toString());
 
 			// **********************************
 			// TODO: COMPLETE SEARCH LOGIC HERE!!
 			// **********************************
+			SearchObject.SetSimilarityMethod();
 			SearchObject.ParseDocsinGivenFolder();
 			SearchObject.RunPorterStemmer();
 
@@ -486,8 +533,8 @@ public class LuceneTest
 			SearchObject.SelectIndex();
 			SearchObject.CreateIndexReaderAndSearcher();
 			
-			SearchObject.Search(SearchObject.Qquery , 10);
-			
+			SearchObject.Search(10);
+			SearchObject.PrintResults();
 		}
 	}
 
