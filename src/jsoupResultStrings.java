@@ -1,9 +1,9 @@
 
 public class jsoupResultStrings 
 {
-	private  String title;
-	private  String body;
-	private String summary;
+	private  String title="";
+	private  String body="";
+	private String summary="";
 	
 	public jsoupResultStrings (String title, String body, String summ)
 	{

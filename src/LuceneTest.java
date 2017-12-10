@@ -1,24 +1,24 @@
- import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Reader;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
+
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
-import org.apache.lucene.analysis.util.FilesystemResourceLoader;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Store;
 import org.apache.lucene.document.TextField;
+import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.store.Directory;
-import org.apache.lucene.store.FSDirectory;
-import org.apache.lucene.util.Version;
 import org.apache.lucene.index.IndexWriterConfig;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -28,14 +28,9 @@ import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.search.similarities.BM25Similarity;
 import org.apache.lucene.search.similarities.ClassicSimilarity;
-import org.apache.lucene.search.similarities.Similarity;
-import org.apache.lucene.search.similarities.TFIDFSimilarity;
+import org.apache.lucene.store.FSDirectory;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
-
-import javafx.scene.control.IndexRange;
-
-import java.nio.file.*;
 
 
 enum rankingModel 
@@ -100,6 +95,7 @@ public class LuceneTest
 	private IndexWriter writer;
 	private File indexDirectory;
 	private Path path;
+	private Query Qquery;
 	
 	public LuceneTest (String docs, String index, rankingModel rank, ArrayList<String> query) 
 	{
@@ -113,17 +109,8 @@ public class LuceneTest
 		this.indexPath = index;
 		this.ranking = rank; 
 		this.path = FileSystems.getDefault().getPath(indexPath);
-		//TODO: Instantiate IndexReader
-		this.IR = IndexReader.open(FSDirectory.open(path));
-		this.ISearch = new IndexSearcher(IR);
-		if(rank.equals(rankingModel.OkapiBM25))
-		{
-			ISearch.setSimilarity(new BM25Similarity());
-		}
-		else if(rank.equals(rankingModel.VectorSpace))
-		{
-			ISearch.setSimilarity(new ClassicSimilarity());
-		}		
+		//TODO: make query object
+			
 	}
 	
 	/*
@@ -141,20 +128,44 @@ public class LuceneTest
 	 */
 	private void createIndexWriter()
 	{
+		FSDirectory dir = null;
 		try{
 			indexDirectory = new File(indexPath);
 			if(!indexDirectory.exists())
 			{
 				indexDirectory.mkdir();
 			}
-			FSDirectory dir = FSDirectory.open(path);
-			IndexWriterConfig config = new IndexWriterConfig(AnalyzerIncludingStemmer);
-			writer = new IndexWriter(dir, config);
+			dir = FSDirectory.open(new File(this.indexPath).toPath());
+			
+			IndexWriterConfig config = new IndexWriterConfig(this.AnalyzerIncludingStemmer);
+			this.writer = new IndexWriter(dir, config);
 		}
 		catch(Exception e){
 			System.out.println("Couldn't get the Index Writer.");
 			e.printStackTrace();
 		}
+		
+		if (dir == null)
+			ErrorAndExit("couldn't find indexDirectory");
+		else
+		{
+			try 
+			{
+				this.IR = DirectoryReader.open(dir); // Error here!
+			} 
+			catch (IOException e) {System.out.println("Error while instantiating index reader." + e);}
+			
+			this.ISearch = new IndexSearcher(IR);
+			if(this.ranking.equals(rankingModel.OkapiBM25))
+			{
+				ISearch.setSimilarity(new BM25Similarity());
+			}
+			else if(this.ranking.equals(rankingModel.VectorSpace))
+			{
+				ISearch.setSimilarity(new ClassicSimilarity());
+			}
+		}
+		
 	}
 	
 	/*
@@ -258,7 +269,7 @@ public class LuceneTest
 		org.jsoup.nodes.Document doc = Jsoup.parse(docPath); 
 		
 		Element summ = doc.select("summary").first();
-		String s = summ.html();
+		String s = (summ == null ? "":summ.html());
 		if (s.length() <= 0)
 			s  = doc.body().text().substring(0, Math.min(doc.body().text().length(), 17)) + "...";
 		 //only one document import (jsoup collides with lucene) 
@@ -267,11 +278,27 @@ public class LuceneTest
 		 return result;
 	}
 
-	private void ParseDocsinGivenFolder() {
-
-		File folder = new File(docPath);
-		File[] listOfFiles = folder.listFiles();
-		showFiles(listOfFiles); 
+	private void ParseDocsinGivenFolder() 
+	{
+		System.out.println("parsing the folder: "+ this.docPath);
+		//TODO returns null, something wrong with docPath?
+		File folder = new File(this.docPath);
+		System.out.println("foldername: " + folder.toString());
+		ArrayList<File> filesInFolder = new ArrayList<File>();
+		try 
+		{
+			filesInFolder = (ArrayList<File>) Files.walk(Paths.get(docPath))
+											       .filter(Files::isRegularFile)
+											       .map(Path::toFile)
+											       .collect(Collectors.toList());
+		} 
+		catch (IOException e) {System.out.println("Error: " +e);}
+		
+		for (int i=0; i< filesInFolder.size(); i++)
+		{
+			System.out.println(filesInFolder.get(i).getName());
+		}
+		showFiles(filesInFolder); 
 		// TODO: read and show each HTML document and save its contents as new Document()						
 
 		// Friedrich added the following:
@@ -293,24 +320,33 @@ public class LuceneTest
 		// n.add(???);
 	}
 
-	private void showFiles(File[] files) {
+	private void showFiles(ArrayList<File> files) {
 		// TODO: Parse the whole folder (including subfolders) and list the
 		// html-documents
 		for (File file : files) {
-			if (file.isDirectory()) {
+			if (file.isDirectory()) 
+			{
 				//System.out.println("Directory: " + file.getName());
-				showFiles(file.listFiles());  //recursion
-			} else {
-				System.out.println("File: " + file.getName());
+				ArrayList<File> F = new ArrayList<File>();
+				try 
+				{
+					F = (ArrayList<File>) Files.walk(Paths.get(file.getCanonicalPath()))
+						       .filter(Files::isRegularFile)
+						       .map(Path::toFile)
+						       .collect(Collectors.toList());
+				} 
+				catch (IOException e) {System.out.println("Error: "+e);}
+				showFiles(F);  //recursion
+			} 
+			else 
+			{
+				//System.out.println("File: " + file.getName());
 				
-				try {
+				try 
+				{
 					getDocument(file, getJsoupStrings(file));
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					//e.printStackTrace();
-					ErrorAndExit(e.toString());
-				}
-
+				} 
+				catch (IOException e) {ErrorAndExit(e.toString());}
 			}
 		}
 	}
@@ -408,6 +444,8 @@ public class LuceneTest
 		if (args.length >= 3) {
 			docFolder = args[0];
 			indexFolder = args[1];
+			if (!new File(indexFolder).isDirectory())
+				ErrorAndExit("Argument 2 is no directory:" + indexFolder);
 			ranking = (args[2].equals("VS") ? rankingModel.VectorSpace
 					: args[2].equals("OK") ? rankingModel.OkapiBM25
 							: rankingModel.invalid);
@@ -440,7 +478,7 @@ public class LuceneTest
 			SearchObject.SelectIndex();
 			SearchObject.StemmQuery();
 			
-			//SearchObject.Search([Query here], 10);
+			SearchObject.Search(SearchObject.Qquery , 10);
 			
 		}
 	}
