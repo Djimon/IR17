@@ -47,6 +47,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -130,7 +131,6 @@ public class SearchObject
 	 */
 	public void createIndexWriter()
 	{
-		
 		try{
 			indexDirectory = new File(indexPath);
 			if(!indexDirectory.exists())
@@ -142,6 +142,9 @@ public class SearchObject
 			
 			IndexWriterConfig config = new IndexWriterConfig(this.AnalyzerIncludingStemmer);
 			config.setSimilarity(this.SIM);
+			// create a new index every time
+			config.setOpenMode(OpenMode.CREATE);
+			
 			this.writer = new IndexWriter(indexFSD, config);
 		}
 		catch(Exception e){
@@ -198,11 +201,17 @@ public class SearchObject
 	public void AddFilestoIndex(String[] URLS)  
 	{	// foreach URL in List add content do Index
 		for (String s : URLS) 
-		{							
+		{		
+			org.jsoup.nodes.Document Doc = null;
+			// connect to URL and generate Jsoup-Document
+			try{
+			Doc = Jsoup.connect(s).get();
+			}catch (IOException e) {
+				System.out.println("Warning: "+ e);
+				continue;
+			}
 			try 
-			{	
-				// connect to URL and generate Jsoup-Document
-				org.jsoup.nodes.Document Doc = Jsoup.connect(s).get(); 
+			{	 
 				//Take Jsoup-Docs title and body to form the lucene-document
 				Document D = getDocument(s, Doc.title(), Doc.body().text());
 				if (D != null)

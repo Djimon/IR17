@@ -18,6 +18,7 @@ public class UrlCrawler {
 	// ArrayList<org.jsoup.nodes.Document>(); // initalize
 	// Documents
 	private static int maxLevel;
+	private static List<String>	uniqueURL = new ArrayList<String>();
 
 	private static String indexDirectory;
 
@@ -67,12 +68,14 @@ public class UrlCrawler {
 	}
 
 	private static void crawlAndAddURLtoList(String URL, int depth)
-			throws IOException {
+			throws IOException 
+	{
+		URL = normalize(URL);
 		int depth_ = depth;
 		// check for cycles
 		boolean duplicate = false;
-		for (int i = 0; i < URLindexList.size(); i++)
-			if (URLindexList.get(i).getURL().equals(URL)) {
+		for (int i = 0; i < uniqueURL.size(); i++)
+			if (uniqueURL.get(i).equals(URL)) {
 				duplicate = true;
 			}
 
@@ -81,11 +84,10 @@ public class UrlCrawler {
 		// check for maxLevel
 		if (duplicate == false && depth <= maxLevel) {
 			try {
-				URL = normalize(URL);
 				// add URL and Index to PrintObjectList
 				PrintObject po = new PrintObject(URL, depth);
-				if (!URLindexList.contains(po))
-					URLindexList.add(po);
+				uniqueURL.add(URL);
+				URLindexList.add(po);
 				//System.out.println(URLindexList.size());
 
 				if (depth < maxLevel) {
@@ -117,7 +119,7 @@ public class UrlCrawler {
 		String URL_norm = URL.toLowerCase();
 		if (URL_norm.endsWith("/"))
 		// replace string by a string that is one character shorter, thus
-		// dleting the trailing slash
+		// deleting the trailing slash
 		{
 			URL_norm = URL_norm.substring(0, URL_norm.length() - 1);
 		}
