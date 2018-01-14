@@ -201,11 +201,17 @@ public class SearchObject
 	public void AddFilestoIndex(String[] URLS)  
 	{	// foreach URL in List add content do Index
 		for (String s : URLS) 
-		{							
+		{		
+			org.jsoup.nodes.Document Doc = null;
+			// connect to URL and generate Jsoup-Document
+			try{
+			Doc = Jsoup.connect(s).get();
+			}catch (IOException e) {
+				System.out.println("Warning: "+ e);
+				continue;
+			}
 			try 
-			{	
-				// connect to URL and generate Jsoup-Document
-				org.jsoup.nodes.Document Doc = Jsoup.connect(s).get(); 
+			{	 
 				//Take Jsoup-Docs title and body to form the lucene-document
 				Document D = getDocument(s, Doc.title(), Doc.body().text());
 				if (D != null)
