@@ -41,11 +41,13 @@ import org.apache.lucene.analysis.en.EnglishAnalyzer;
 import org.apache.lucene.document.Document;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.Field.Store;
+import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
 import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.IndexSearcher;
@@ -59,6 +61,7 @@ import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.util.BytesRef;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
+import org.tartarus.snowball.ext.PorterStemmer;
 
 
 public class SearchObject 
@@ -69,11 +72,12 @@ public class SearchObject
 	
 	ArrayList<SearchResult> SearchOutput = new ArrayList<SearchResult>();
 	EnglishAnalyzer AnalyzerIncludingStemmer = new EnglishAnalyzer();
+	PorterStemmer stemmer = new PorterStemmer();
 	private IndexReader IR;
 	private IndexSearcher ISearch;
 	private FSDirectory indexFSD = null;
 	Similarity SIM = null;
-	private String docPath;
+	private String baseURL;
 	private String indexPath;
 	// Friedrich added the following:
 	private static final String fieldPath = "path";
@@ -90,15 +94,19 @@ public class SearchObject
 	private Query Qquery;
 	
 	// CONSTRUCTOR
-	public SearchObject (String docs, String index, rankingModel rank, ArrayList<String> query) 
+	public SearchObject (String seed, String index, rankingModel rank, ArrayList<String> query) 
 	{
 		this.querryArray = new String[query.size()];
-		for (int i = 0; i < query.size(); i++) {
-			this.querryArray[i] = query.get(i);
-			this.querryString += query.get(i) + " ";
+		for (int i = 0; i < query.size(); i++) 
+		{
+			// Stemming the query and transform it into Array and String
+			stemmer.setCurrent(query.get(i));
+			stemmer.stem();
+			this.querryArray[i] = stemmer.getCurrent();
+			this.querryString += stemmer.getCurrent() + " ";
 			// System.out.println("get "+query.get(i));
 		}
-		this.docPath = docs;
+		this.baseURL = seed;
 		this.indexPath = index;
 		this.ranking = rank; 
 		this.path = FileSystems.getDefault().getPath(indexPath);
@@ -127,6 +135,7 @@ public class SearchObject
 			indexDirectory = new File(indexPath);
 			if(!indexDirectory.exists())
 			{
+				System.out.println("new");
 				indexDirectory.mkdir();
 			}
 			indexFSD = FSDirectory.open(new File(this.indexPath).toPath());
@@ -141,60 +150,7 @@ public class SearchObject
 		}
 		
 	}
-	
-	/*
-	 Gets all files at given source file path and checks if it can be used. If usable it will be processed and indexed.
-	 -> Duplicate with ParseDocsinGivenFolder
-	 */
-/*	
- * public void validateFiles()
-	{
-		File[] Sourcefiles = new File[new File(docPath).list().length];
-		Sourcefiles = new File(docPath).listFiles();
-		
-		for(File f : Sourcefiles)
-		{
-			try{
-				// Checks if file can be used
-				if(!f.isDirectory() && f.exists() && f.isFile() && !f.isHidden() 
-					&& f.canRead() && f.length() > 0 && f.getName().endsWith(".html"))
-				{
-					System.out.println("Currently trying to index file: " + f.getAbsolutePath());
-					// calling function to actually index the file
-					indexFile(f);
-					System.out.println("Successfully index file: " + f.getAbsolutePath());
-				}
-			}
-			catch(Exception e)
-			{
-				System.out.println("Couldn't index current file at " + f.getAbsolutePath());
-				e.printStackTrace();
-			}
-		}
-	}
-*/
-	
-	/*
-	 Converting all files into multifield documents with getDocument(), then adding it to the
-	 Index Writer and therefore indexing the file.
-	 -> Duplicate with ParseDocsinGivenFolder
-	 */
-/*
-public void indexFile(File f)
-	{
-		try {
-			Document d = getDocument(f, getJsoupStrings(f));
-			if(d != null)
-			{
-				writer.addDocument(d);
-			}
-		} catch (IOException e) {
-			System.out.println("Couldn't get Document.");
-			e.printStackTrace();
-		}	
-	}
-*/
-	
+
 	
 	/*
 	 Closing the Index Writer after processing all files.
@@ -214,24 +170,24 @@ public void indexFile(File f)
 	/* 
 	 * take the parsed results to form the document with the different fields 
 	 */
-	public Document getDocument(File file, jsoupResultStrings result) throws IOException {
+	public Document getDocument(String url, jsoupResultStrings result) throws IOException {
 		// TASK: Method to get a lucene document from HTML files in folder
 		// create various types of fields
 		Document document = new Document();
 		
 		// index file contents
-		Field contentField = new TextField(Fieldz.title.name(), result.getBody(), Store.YES);
+		Field contentField = new StringField(Fieldz.title.name(), result.getTitle(), Store.YES);
 		// index file name
-		Field fileNameField = new TextField(Fieldz.content.name(), result.getTitle(), Store.YES);
+		Field fileNameField = new TextField(Fieldz.content.name(), result.getBody(), Store.YES);
 		// index file path
-		Field filePathField = new TextField(Fieldz.path.name(),file.getCanonicalPath(), Store.YES);
+		Field filePathField = new StringField(Fieldz.path.name(),url, Store.YES);
 		// index file summary
-		Field summaryField = new TextField(Fieldz.summary.name(), result.getSummary(), Store.YES);
+		//Field summaryField = new TextField(Fieldz.summary.name(), result.getSummary(), Store.YES);
 
 		document.add(contentField);
 		document.add(fileNameField);
 		document.add(filePathField);
-		document.add(summaryField);
+		//document.add(summaryField);
 
 		return document;
 	}
@@ -242,7 +198,10 @@ public void indexFile(File f)
 	public jsoupResultStrings getJsoupStrings(File file)
 	{	
 		// create documents via JSOUP(jsoup.org) 
-		org.jsoup.nodes.Document doc = Jsoup.parse(docPath); 
+		/*
+		 * TODO: add here some Logic from Friedrich for webcrawling
+		 */
+		org.jsoup.nodes.Document doc = Jsoup.parse(baseURL); 
 		
 		Element summ = doc.select("summary").first();
 		String s = (summ == null ? "":summ.html());
@@ -250,7 +209,10 @@ public void indexFile(File f)
 			s  = doc.body().text().substring(0, Math.min(doc.body().text().length(), 17)) + "...";
 		 //only one document import (jsoup collides with lucene) 
 		 //ouput the title and the body content 
-		 jsoupResultStrings result = new jsoupResultStrings(doc.title(),doc.body().text(), s);
+		stemmer.setCurrent(doc.body().text());
+		stemmer.stem();
+		String doctext = stemmer.getCurrent();
+		 jsoupResultStrings result = new jsoupResultStrings(doc.title(),doctext, s);
 		 return result;
 	}
 
@@ -259,13 +221,12 @@ public void indexFile(File f)
 	 */
 	public void ParseDocsinGivenFolder() throws IOException 
 	{
-		System.out.println("parsing the folder: "+ this.docPath);
-		File folder = new File(this.docPath);
-		//System.out.println("foldername: " + folder.toString());
+		System.out.println("parsing the folder: "+ this.baseURL);
+		File folder = new File(this.baseURL); //TODO: no more file
 		ArrayList<File> filesInFolder = new ArrayList<File>();
 		try 
 		{
-			filesInFolder = (ArrayList<File>) Files.walk(Paths.get(docPath))
+			filesInFolder = (ArrayList<File>) Files.walk(Paths.get(baseURL))
 											       .filter(Files::isRegularFile)
 											       .map(Path::toFile)
 											       .collect(Collectors.toList());
@@ -302,6 +263,7 @@ public void indexFile(File f)
 				//System.out.println("File: " + file.getName());				
 				try 
 				{
+					//TODO: get Document (URL, html-Inhalt der URL)
 					Document D = getDocument(file, getJsoupStrings(file));
 					if (D != null)
 						writer.addDocument(D);
@@ -312,7 +274,7 @@ public void indexFile(File f)
 	}
 
 	/*
-	 Creates the indec reader and the index searcher. The FSDirectory must exist at this time
+	 Creates the index reader and the index searcher. The FSDirectory must exist at this time
 	 */
 	public void CreateIndexReaderAndSearcher() 
 	{
@@ -373,20 +335,14 @@ public void indexFile(File f)
 	 creates an easy to read output data object (SearchResult)
 	 */
 	public void Search(int bestN) 
-	{
-		/* TODO: Do the actual searching with:
-		 * - calculating tf-idf
-		 * - relevance score
-		 * - ranking
-		 * - konkurierende Suche in Titel und Textkörper (mulrifield search)
-		 */		
+	{	
 		ScoreDoc[] hits = null;
-		Query Qtitle = null;
-		Query Qbody = null;
+		Query querry = null;
 		try 
 		{
-			Qtitle = new QueryParser(Fieldz.title.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
-			Qbody = new QueryParser(Fieldz.content.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
+			querry = MultiFieldQueryParser.parse(new String[]{this.querryString, this.querryString}, new String[]{Fieldz.content.name(),Fieldz.title.name()}, this.AnalyzerIncludingStemmer);
+			//Qtitle = new QueryParser(Fieldz.title.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
+			//Qbody = new QueryParser(Fieldz.content.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
 			System.out.println("Searching for \"" + this.querryString + "\"...");
 		} 
 		catch (ParseException e1) {ErrorAndExit(e1.toString());}
@@ -394,22 +350,12 @@ public void indexFile(File f)
 		try 
 		{
 			System.out.println("Ranking the best 10 documents...");
-			TopDocs docsTitle = ISearch.search(Qtitle, bestN);
-			System.out.println("hits in title = " + docsTitle.totalHits);
-			TopDocs docsBody = ISearch.search(Qbody, bestN);
-			System.out.println("hits in body = " + docsTitle.totalHits);
-	        hits = TopDocs.merge(bestN, new TopDocs[]{docsTitle,docsBody}).scoreDocs;       
+			TopDocs docs = ISearch.search(querry, bestN);
+			System.out.println("total hits: " + docs.totalHits);
+	        hits = docs.scoreDocs;       
 		} 
 		catch (IOException e2) {ErrorAndExit(e2.toString());}
 		
-		/* ERROR DESCRIPTION
-		 * =================================================================================================
-		 * Unfortunately our TopDocs array seems to be empty, so something is wrong with the search function
-		 * We instantiated the IndexSearcher with the correct similarity method.
-		 * During Debugging we checked the queries which seems to be O.K.
-		 * So from here we did not really know, what the problem could be.
-		 * =================================================================================================
-		 */
 		
 		if (hits.length > 0)
 		{
@@ -428,7 +374,6 @@ public void indexFile(File f)
 				{
 					SearchOutput.add(new SearchResult(i+1, 
 													  D.get(Fieldz.title.name()),
-													  D.get(Fieldz.summary.name()),
 													  hits[i].score,
 													  D.get(Fieldz.path.name())));
 				}		 
@@ -465,7 +410,7 @@ public void indexFile(File f)
 			temp += s;
 			temp += ",";
 		}
-		return (this.docPath + "\n" + this.indexPath + "\n"
+		return (this.baseURL + "\n" + this.indexPath + "\n"
 				+ this.ranking.toString() + "\n" + temp);
 	}
 

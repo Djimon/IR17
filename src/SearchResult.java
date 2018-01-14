@@ -8,7 +8,7 @@ public class SearchResult
 	private String score;
 	private String path;
 	
-	public SearchResult(int ran, String tit, String sum, float sco, String pat)
+	public SearchResult(int ran, String tit, float sco, String pat)
 	{
 		this.rank = Integer.toString(ran);
 		this.title = tit;

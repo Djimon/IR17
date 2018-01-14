@@ -9,6 +9,7 @@ public class jsoupResultStrings
 	{
 		this.title=title;
 		this.body=body;
+		this.summary = summ;
 	}
 	
 	public String getTitle() 
