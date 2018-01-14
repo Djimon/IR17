@@ -4,7 +4,6 @@ public class SearchResult
 	// rank, title and summary, relevance score and path
 	private String rank;
 	private String title;
-	private String summary;
 	private String score;
 	private String path;
 	
@@ -12,7 +11,6 @@ public class SearchResult
 	{
 		this.rank = Integer.toString(ran);
 		this.title = tit;
-		this.summary = sum;
 		this.score = Float.toString(sco);
 		this.path = pat;
 	}
@@ -22,7 +20,6 @@ public class SearchResult
 		String temp = "";
 		temp += rank +". ";
 		temp += title + ", \"";
-		temp += summary + "\"";
 		temp += "Score:" + score ;
 		temp += "(" + path + ")\n";
 		return temp;
@@ -36,9 +33,6 @@ public class SearchResult
 		return title;
 	}
 
-	public String getSummary() {
-		return summary;
-	}
 
 	public String getScore() {
 		return score;

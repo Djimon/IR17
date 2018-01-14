@@ -2,6 +2,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 public class LuceneSearcher 
 {
@@ -15,7 +16,7 @@ public class LuceneSearcher
 		rankingModel ranking = rankingModel.invalid;
 		ArrayList<String> query = new ArrayList<String>();
 		SearchObject SearchObject = null;
-		URLcrawlerAndIndexer URLCrawler = new URLcrawlerAndIndexer();
+		UrlCrawler URLCrawler = new UrlCrawler();
 		// [seed URL] [crawl depth] [pathtoindexfolder] [query]
 
 		if (args.length >= 3) {
@@ -33,6 +34,7 @@ public class LuceneSearcher
 		{
 			query.add(args[i]);
 		}
+		System.out.println("Parsing the seed URL at depth "+depth);
 		List<PrintObject> urlListe = URLCrawler.run(seedURL, indexFolder, depth);
 		String[] URLs = new String[urlListe.size()];
 		int i = 0;
@@ -43,7 +45,7 @@ public class LuceneSearcher
 		SearchObject = new SearchObject(URLs, indexFolder, ranking, query);
 		System.out.println("Successfully instantiated SearchObject:");
 		//System.out.println(SearchObject.toString());
-
+		System.out.println("Creating Index..");
 		SearchObject.SetSimilarityMethod();
 
 		SearchObject.SelectIndex();
@@ -51,6 +53,11 @@ public class LuceneSearcher
 		
 		SearchObject.Search(10); // the 10 best results
 		SearchObject.PrintResults();
+		
+		System.out.println("Press Enter to exit.");
+		Scanner scanner = new Scanner(System.in);
+		String input = scanner.nextLine(); //so the program stays open if you want to analyse the output
+		System.exit(0);
 	}
 	
 }

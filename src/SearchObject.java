@@ -195,14 +195,15 @@ public class SearchObject
 	/*
 	 take all .html files in the given folderlist and add them to the Index writer
 	 */
-	public void AddFilestoIndex(String[] URLS) throws IOException 
+	public void AddFilestoIndex(String[] URLS)  
 	{	// foreach URL in List add content do Index
 		for (String s : URLS) 
-		{
-			// connect to URL and generate Jsoup-Document
-			org.jsoup.nodes.Document Doc = Jsoup.connect(s).get(); 				
+		{							
 			try 
-			{	//Take Jsoup-Docs title and body to form the lucene-document
+			{	
+				// connect to URL and generate Jsoup-Document
+				org.jsoup.nodes.Document Doc = Jsoup.connect(s).get(); 
+				//Take Jsoup-Docs title and body to form the lucene-document
 				Document D = getDocument(s, Doc.title(), Doc.body().text());
 				if (D != null)
 					writer.addDocument(D);
@@ -280,15 +281,15 @@ public class SearchObject
 			querry = MultiFieldQueryParser.parse(new String[]{this.querryString, this.querryString}, new String[]{Fieldz.content.name(),Fieldz.title.name()}, this.AnalyzerIncludingStemmer);
 			//Qtitle = new QueryParser(Fieldz.title.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
 			//Qbody = new QueryParser(Fieldz.content.name(), this.AnalyzerIncludingStemmer).parse(this.querryString);
-			System.out.println("Searching for \"" + this.querryString + "\"...");
+			System.out.println("Searching for \"" + this.querryString + "\"(stemmed)");
 		} 
 		catch (ParseException e1) {ErrorAndExit(e1.toString());}
 		
 		try 
 		{
-			System.out.println("Ranking the best 10 documents...");
 			TopDocs docs = ISearch.search(querry, bestN);
 			System.out.println("total hits: " + docs.totalHits);
+			System.out.println("Ranking the best 10 documents...");
 	        hits = docs.scoreDocs;       
 		} 
 		catch (IOException e2) {ErrorAndExit(e2.toString());}
