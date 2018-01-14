@@ -47,6 +47,7 @@ import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.IndexWriterConfig.OpenMode;
 import org.apache.lucene.queryparser.classic.MultiFieldQueryParser;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
@@ -130,7 +131,6 @@ public class SearchObject
 	 */
 	public void createIndexWriter()
 	{
-		
 		try{
 			indexDirectory = new File(indexPath);
 			if(!indexDirectory.exists())
@@ -142,6 +142,9 @@ public class SearchObject
 			
 			IndexWriterConfig config = new IndexWriterConfig(this.AnalyzerIncludingStemmer);
 			config.setSimilarity(this.SIM);
+			// create a new index every time
+			config.setOpenMode(OpenMode.CREATE);
+			
 			this.writer = new IndexWriter(indexFSD, config);
 		}
 		catch(Exception e){

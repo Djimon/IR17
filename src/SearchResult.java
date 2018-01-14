@@ -19,8 +19,8 @@ public class SearchResult
 	{
 		String temp = "";
 		temp += rank +". ";
-		temp += title + ", \"";
-		temp += "Score:" + score ;
+		temp += title + ", ";
+		temp += "Score: " + score +", ";
 		temp += "(" + path + ")\n";
 		return temp;
 	}
