@@ -1,6 +1,7 @@
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 public class LuceneSearcher 
 {
@@ -14,6 +15,7 @@ public class LuceneSearcher
 		rankingModel ranking = rankingModel.invalid;
 		ArrayList<String> query = new ArrayList<String>();
 		SearchObject SearchObject = null;
+		URLcrawlerAndIndexer URLCrawler = new URLcrawlerAndIndexer();
 		// [seed URL] [crawl depth] [pathtoindexfolder] [query]
 
 		if (args.length >= 3) {
@@ -27,21 +29,28 @@ public class LuceneSearcher
 			SearchObject.ErrorAndExit("arguments missing - programm needs at least 4");
 		}
 
-		for (int i = 3; i < args.length; i++) {
+		for (int i = 3; i < args.length; i++) 
+		{
 			query.add(args[i]);
-
-			SearchObject = new SearchObject(seedURL, indexFolder, ranking, query);
-			System.out.println("Successfully instantiated SearchObject:");
-			//System.out.println(SearchObject.toString());
-
-			SearchObject.SetSimilarityMethod();
-
-			SearchObject.SelectIndex();
-			SearchObject.CreateIndexReaderAndSearcher();
-			
-			SearchObject.Search(10); // the 10 best results
-			SearchObject.PrintResults();
 		}
+		List<PrintObject> urlListe = URLCrawler.run(seedURL, indexFolder, depth);
+		String[] URLs = new String[urlListe.size()];
+		int i = 0;
+		for (PrintObject p : urlListe)
+		{
+			URLs[i++] = p.getURL();
+		}
+		SearchObject = new SearchObject(URLs, indexFolder, ranking, query);
+		System.out.println("Successfully instantiated SearchObject:");
+		//System.out.println(SearchObject.toString());
+
+		SearchObject.SetSimilarityMethod();
+
+		SearchObject.SelectIndex();
+		SearchObject.CreateIndexReaderAndSearcher();
+		
+		SearchObject.Search(10); // the 10 best results
+		SearchObject.PrintResults();
 	}
 	
 }

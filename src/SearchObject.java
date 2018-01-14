@@ -77,7 +77,7 @@ public class SearchObject
 	private IndexSearcher ISearch;
 	private FSDirectory indexFSD = null;
 	Similarity SIM = null;
-	private String baseURL;
+	private String[] URLArray;
 	private String indexPath;
 	// Friedrich added the following:
 	private static final String fieldPath = "path";
@@ -94,7 +94,7 @@ public class SearchObject
 	private Query Qquery;
 	
 	// CONSTRUCTOR
-	public SearchObject (String seed, String index, rankingModel rank, ArrayList<String> query) 
+	public SearchObject (String[] urlList, String index, rankingModel rank, ArrayList<String> query) 
 	{
 		this.querryArray = new String[query.size()];
 		for (int i = 0; i < query.size(); i++) 
@@ -106,7 +106,7 @@ public class SearchObject
 			this.querryString += stemmer.getCurrent() + " ";
 			// System.out.println("get "+query.get(i));
 		}
-		this.baseURL = seed;
+		this.URLArray = urlList;
 		this.indexPath = index;
 		this.ranking = rank; 
 		this.path = FileSystems.getDefault().getPath(indexPath);
@@ -120,7 +120,7 @@ public class SearchObject
 	public void SelectIndex() throws IOException 
 	{	
 		createIndexWriter();
-		ParseDocsinGivenFolder();
+		AddFilestoIndex(this.URLArray);
 		//validateFiles();
 		closeIndexWriter();
 	}
@@ -170,15 +170,15 @@ public class SearchObject
 	/* 
 	 * take the parsed results to form the document with the different fields 
 	 */
-	public Document getDocument(String url, jsoupResultStrings result) throws IOException {
+	public Document getDocument(String url, String title, String content) throws IOException {
 		// TASK: Method to get a lucene document from HTML files in folder
 		// create various types of fields
 		Document document = new Document();
 		
 		// index file contents
-		Field contentField = new StringField(Fieldz.title.name(), result.getTitle(), Store.YES);
+		Field contentField = new StringField(Fieldz.title.name(), title, Store.YES);
 		// index file name
-		Field fileNameField = new TextField(Fieldz.content.name(), result.getBody(), Store.YES);
+		Field fileNameField = new TextField(Fieldz.content.name(), content, Store.YES);
 		// index file path
 		Field filePathField = new StringField(Fieldz.path.name(),url, Store.YES);
 		// index file summary
@@ -193,83 +193,20 @@ public class SearchObject
 	}
 	
 	/*
-	 translates the html-tags to ready2use strings for later
-	 */
-	public jsoupResultStrings getJsoupStrings(File file)
-	{	
-		// create documents via JSOUP(jsoup.org) 
-		/*
-		 * TODO: add here some Logic from Friedrich for webcrawling
-		 */
-		org.jsoup.nodes.Document doc = Jsoup.parse(baseURL); 
-		
-		Element summ = doc.select("summary").first();
-		String s = (summ == null ? "":summ.html());
-		if (s.length() <= 0)
-			s  = doc.body().text().substring(0, Math.min(doc.body().text().length(), 17)) + "...";
-		 //only one document import (jsoup collides with lucene) 
-		 //ouput the title and the body content 
-		stemmer.setCurrent(doc.body().text());
-		stemmer.stem();
-		String doctext = stemmer.getCurrent();
-		 jsoupResultStrings result = new jsoupResultStrings(doc.title(),doctext, s);
-		 return result;
-	}
-
-	/*
-	 take the given Input folder (argument 1) and list all files and folders recursively
-	 */
-	public void ParseDocsinGivenFolder() throws IOException 
-	{
-		System.out.println("parsing the folder: "+ this.baseURL);
-		File folder = new File(this.baseURL); //TODO: no more file
-		ArrayList<File> filesInFolder = new ArrayList<File>();
-		try 
-		{
-			filesInFolder = (ArrayList<File>) Files.walk(Paths.get(baseURL))
-											       .filter(Files::isRegularFile)
-											       .map(Path::toFile)
-											       .collect(Collectors.toList());
-		} 
-		catch (IOException e) {System.out.println("Error: " +e);}
-		
-		AddFilestoIndex(filesInFolder); 					
-	}
-
-	/*
 	 take all .html files in the given folderlist and add them to the Index writer
 	 */
-	public void AddFilestoIndex(ArrayList<File> files) throws IOException 
-	{
-		// TODO: Parse the whole folder (including subfolders) and list the html-documents
-		for (File file : files) 
+	public void AddFilestoIndex(String[] URLS) throws IOException 
+	{	// foreach URL in List add content do Index
+		for (String s : URLS) 
 		{
-			if (file.isDirectory()) 
-			{
-				//System.out.println("Directory: " + file.getName());
-				ArrayList<File> F = new ArrayList<File>();
-				try 
-				{
-					F = (ArrayList<File>) Files.walk(Paths.get(file.getCanonicalPath()))
-						       .filter(Files::isRegularFile)
-						       .map(Path::toFile)
-						       .collect(Collectors.toList());
-				} 
-				catch (IOException e) {System.out.println("Error: "+e);}
-				AddFilestoIndex(F);  //recursion
-			} 
-			else if (file.getCanonicalPath().endsWith(".html"))
-			{
-				//System.out.println("File: " + file.getName());				
-				try 
-				{
-					//TODO: get Document (URL, html-Inhalt der URL)
-					Document D = getDocument(file, getJsoupStrings(file));
-					if (D != null)
-						writer.addDocument(D);
-				} 
-				catch (IOException e) {ErrorAndExit(e.toString());}
-			}
+			// connect to URL and generate Jsoup-Document
+			org.jsoup.nodes.Document Doc = Jsoup.connect(s).get(); 				
+			try 
+			{	//Take Jsoup-Docs title and body to form the lucene-document
+				Document D = getDocument(s, Doc.title(), Doc.body().text());
+				if (D != null)
+					writer.addDocument(D);
+			} catch (IOException e) {ErrorAndExit(e.toString());}
 		}
 	}
 
@@ -410,7 +347,7 @@ public class SearchObject
 			temp += s;
 			temp += ",";
 		}
-		return (this.baseURL + "\n" + this.indexPath + "\n"
+		return (this.URLArray + "\n" + this.indexPath + "\n"
 				+ this.ranking.toString() + "\n" + temp);
 	}
 
